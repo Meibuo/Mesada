@@ -1,15 +1,56 @@
 from flask import Flask, render_template, request, jsonify
 import random
 from datetime import datetime
+import psycopg2
+import os
+import json
 
 app = Flask(__name__)
 app.secret_key = '30591bbfa70ae38582897d226608fd99'
 
+# Configuração do PostgreSQL
+def get_db_connection():
+    DATABASE_URL = os.environ.get('DATABASE_URL', 'postgresql://mesada_db_user:rJFcZevYmO079FkW9ndlqV4gtLNvdbx9@dpg-d438j52li9vc73cng1ug-a/mesada_db')
+    conn = psycopg2.connect(DATABASE_URL)
+    return conn
+
+# Inicializar banco de dados
+def init_db():
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        # Tabela de jogadores
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS players (
+                id SERIAL PRIMARY KEY,
+                nome VARCHAR(100) UNIQUE NOT NULL,
+                level INTEGER DEFAULT 1,
+                xp INTEGER DEFAULT 0,
+                xp_need INTEGER DEFAULT 100,
+                mesada DECIMAL(10,2) DEFAULT 10.00,
+                tasks_completed INTEGER DEFAULT 0,
+                battles_won INTEGER DEFAULT 0,
+                battles_lost INTEGER DEFAULT 0,
+                total_money_earned DECIMAL(10,2) DEFAULT 10.00,
+                skills JSONB DEFAULT '{"forca": 1, "defesa": 1, "sorte": 1, "inteligencia": 1}',
+                inventory JSONB DEFAULT '[]',
+                equipped JSONB DEFAULT '{"weapon": null, "armor": null, "accessory": null}',
+                achievements_unlocked JSONB DEFAULT '[]',
+                join_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        conn.commit()
+        cur.close()
+        conn.close()
+        print("✅ Banco de dados inicializado com sucesso!")
+    except Exception as e:
+        print(f"❌ Erro ao inicializar banco: {e}")
+
 # Dados do jogo
-players = {}
 shop_items = []
 achievements = []
-leaderboard = []
 
 # Inicializar dados do jogo
 def init_game_data():
@@ -34,30 +75,43 @@ def init_game_data():
     ]
 
 class Player:
-    def __init__(self, nome):
-        self.nome = nome
-        self.level = 1
-        self.xp = 0
-        self.xp_need = 100
-        self.mesada = 10.00  # Mesada inicial
-        self.tasks_completed = 0
-        self.battles_won = 0
-        self.battles_lost = 0
-        self.total_money_earned = 10.00
-        self.skills = {
-            'forca': 1,
-            'defesa': 1,
-            'sorte': 1,
-            'inteligencia': 1
-        }
-        self.inventory = []
-        self.equipped = {
-            'weapon': None,
-            'armor': None,
-            'accessory': None
-        }
-        self.achievements_unlocked = []
-        self.join_date = datetime.now().isoformat()
+    def __init__(self, data):
+        self.id = data[0]
+        self.nome = data[1]
+        self.level = data[2]
+        self.xp = data[3]
+        self.xp_need = data[4]
+        self.mesada = float(data[5])
+        self.tasks_completed = data[6]
+        self.battles_won = data[7]
+        self.battles_lost = data[8]
+        self.total_money_earned = float(data[9])
+        self.skills = data[10] if data[10] else {"forca": 1, "defesa": 1, "sorte": 1, "inteligencia": 1}
+        self.inventory = data[11] if data[11] else []
+        self.equipped = data[12] if data[12] else {"weapon": None, "armor": None, "accessory": None}
+        self.achievements_unlocked = data[13] if data[13] else []
+        self.join_date = data[14]
+    
+    def save(self):
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute('''
+            UPDATE players SET 
+                level = %s, xp = %s, xp_need = %s, mesada = %s, 
+                tasks_completed = %s, battles_won = %s, battles_lost = %s,
+                total_money_earned = %s, skills = %s, inventory = %s,
+                equipped = %s, achievements_unlocked = %s
+            WHERE id = %s
+        ''', (
+            self.level, self.xp, self.xp_need, self.mesada,
+            self.tasks_completed, self.battles_won, self.battles_lost,
+            self.total_money_earned, json.dumps(self.skills), 
+            json.dumps(self.inventory), json.dumps(self.equipped),
+            json.dumps(self.achievements_unlocked), self.id
+        ))
+        conn.commit()
+        cur.close()
+        conn.close()
     
     def add_xp(self, amount):
         self.xp += amount
@@ -71,7 +125,7 @@ class Player:
         self.level += 1
         self.xp -= self.xp_need
         self.xp_need = int(self.xp_need * 1.5)
-        self.mesada += 8.00  # Aumento maior de mesada
+        self.mesada += 8.00
         # Melhorar habilidades aleatórias
         skill_to_up = random.choice(list(self.skills.keys()))
         self.skills[skill_to_up] += 1
@@ -80,22 +134,26 @@ class Player:
         xp_reward = difficulty * 25
         money_reward = difficulty * 2.50
         
-        self.add_xp(xp_reward)
+        level_ups = self.add_xp(xp_reward)
         self.mesada += money_reward
         self.total_money_earned += money_reward
         self.tasks_completed += 1
         
         # Verificar conquistas
-        self.check_achievements()
+        new_achievements = self.check_achievements()
+        
+        self.save()
         
         return {
             'xp': xp_reward,
             'money': money_reward,
+            'level_ups': level_ups,
+            'new_achievements': new_achievements,
             'message': f'✅ Missão "{task_name}" completa! +{xp_reward} XP +R${money_reward:.2f}'
         }
     
     def battle(self, difficulty):
-        # Calcular chance de vitória baseada em level, equipamentos e skills
+        # Calcular chance de vitória
         base_chance = 0.5 + (self.level * 0.05)
         weapon_bonus = self.equipped['weapon']['power'] * 0.02 if self.equipped['weapon'] else 0
         skill_bonus = self.skills['forca'] * 0.03
@@ -106,29 +164,33 @@ class Player:
         if victory:
             xp_reward = difficulty * 60
             money_reward = difficulty * 8.00
-            self.add_xp(xp_reward)
+            level_ups = self.add_xp(xp_reward)
             self.mesada += money_reward
             self.total_money_earned += money_reward
             self.battles_won += 1
             
             # Chance de drop de item
             item_drop = None
-            if random.random() < 0.3:  # 30% de chance de drop
+            if random.random() < 0.3:
                 item_drop = random.choice(shop_items)
                 self.inventory.append(item_drop)
             
-            self.check_achievements()
+            new_achievements = self.check_achievements()
+            self.save()
             
             return {
                 'victory': True,
                 'xp': xp_reward,
                 'money': money_reward,
+                'level_ups': level_ups,
                 'item_drop': item_drop,
+                'new_achievements': new_achievements,
                 'message': f'🏆 Vitória épica! +{xp_reward} XP +R${money_reward:.2f}' + 
                           (f' + {item_drop["name"]}' if item_drop else '')
             }
         else:
             self.battles_lost += 1
+            self.save()
             return {
                 'victory': False,
                 'message': '💀 Derrota! Mais sorte na próxima vez!'
@@ -139,6 +201,7 @@ class Player:
         if item and self.mesada >= item['price']:
             self.mesada -= item['price']
             self.inventory.append(item)
+            self.save()
             return True
         return False
     
@@ -151,6 +214,7 @@ class Player:
                 self.inventory.append(self.equipped[slot])
             self.equipped[slot] = item
             self.inventory.remove(item)
+            self.save()
             return True
         return False
     
@@ -177,6 +241,9 @@ class Player:
                     self.mesada += achievement['reward']
                     new_achievements.append(achievement)
         
+        if new_achievements:
+            self.save()
+        
         return new_achievements
 
 # Rotas da API
@@ -186,27 +253,89 @@ def index():
 
 @app.route('/create_player', methods=['POST'])
 def create_player():
-    nome = request.json['nome']
-    players[nome] = Player(nome)
-    return jsonify({'success': True, 'player': players[nome].__dict__})
+    try:
+        nome = request.json['nome']
+        
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        # Verificar se jogador já existe
+        cur.execute('SELECT * FROM players WHERE nome = %s', (nome,))
+        existing_player = cur.fetchone()
+        
+        if existing_player:
+            cur.close()
+            conn.close()
+            return jsonify({'success': True, 'player': Player(existing_player).__dict__})
+        
+        # Criar novo jogador
+        cur.execute('''
+            INSERT INTO players (nome) VALUES (%s) RETURNING *
+        ''', (nome,))
+        
+        new_player = cur.fetchone()
+        conn.commit()
+        cur.close()
+        conn.close()
+        
+        player_obj = Player(new_player)
+        return jsonify({'success': True, 'player': player_obj.__dict__})
+        
+    except Exception as e:
+        print(f"Erro ao criar jogador: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/get_player/<player_name>')
+def get_player(player_name):
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute('SELECT * FROM players WHERE nome = %s', (player_name,))
+        player_data = cur.fetchone()
+        cur.close()
+        conn.close()
+        
+        if player_data:
+            player_obj = Player(player_data)
+            return jsonify({'success': True, 'player': player_obj.__dict__})
+        else:
+            return jsonify({'success': False, 'error': 'Jogador não encontrado'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/complete_task', methods=['POST'])
 def complete_task():
-    data = request.json
-    player = players.get(data['nome'])
-    if player:
-        result = player.complete_task(data['task_name'], data['difficulty'])
-        return jsonify({'success': True, 'result': result, 'player': player.__dict__})
-    return jsonify({'success': False})
+    try:
+        data = request.json
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute('SELECT * FROM players WHERE nome = %s', (data['nome'],))
+        player_data = cur.fetchone()
+        
+        if player_data:
+            player = Player(player_data)
+            result = player.complete_task(data['task_name'], data['difficulty'])
+            return jsonify({'success': True, 'result': result, 'player': player.__dict__})
+        return jsonify({'success': False})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/battle', methods=['POST'])
 def battle():
-    data = request.json
-    player = players.get(data['nome'])
-    if player:
-        result = player.battle(data['difficulty'])
-        return jsonify({'success': True, 'result': result, 'player': player.__dict__})
-    return jsonify({'success': False})
+    try:
+        data = request.json
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute('SELECT * FROM players WHERE nome = %s', (data['nome'],))
+        player_data = cur.fetchone()
+        
+        if player_data:
+            player = Player(player_data)
+            result = player.battle(data['difficulty'])
+            return jsonify({'success': True, 'result': result, 'player': player.__dict__})
+        return jsonify({'success': False})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/shop')
 def get_shop():
@@ -214,55 +343,87 @@ def get_shop():
 
 @app.route('/buy', methods=['POST'])
 def buy_item():
-    data = request.json
-    player = players.get(data['player_name'])
-    if player and player.buy_item(data['item_id']):
-        return jsonify({'success': True, 'player': player.__dict__})
-    return jsonify({'success': False})
+    try:
+        data = request.json
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute('SELECT * FROM players WHERE nome = %s', (data['player_name'],))
+        player_data = cur.fetchone()
+        
+        if player_data:
+            player = Player(player_data)
+            if player.buy_item(data['item_id']):
+                return jsonify({'success': True, 'player': player.__dict__})
+        return jsonify({'success': False})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/equip', methods=['POST'])
 def equip_item():
-    data = request.json
-    player = players.get(data['player_name'])
-    if player and player.equip_item(data['item_name']):
-        return jsonify({'success': True, 'player': player.__dict__})
-    return jsonify({'success': False})
+    try:
+        data = request.json
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute('SELECT * FROM players WHERE nome = %s', (data['player_name'],))
+        player_data = cur.fetchone()
+        
+        if player_data:
+            player = Player(player_data)
+            if player.equip_item(data['item_name']):
+                return jsonify({'success': True, 'player': player.__dict__})
+        return jsonify({'success': False})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/achievements/<player_name>')
 def get_achievements(player_name):
-    player = players.get(player_name)
-    if player:
-        player_achs = [a for a in achievements if a['id'] in player.achievements_unlocked]
-        available_achs = [a for a in achievements if a['id'] not in player.achievements_unlocked]
-        return jsonify({
-            'unlocked': player_achs,
-            'available': available_achs
-        })
-    return jsonify({'success': False})
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute('SELECT * FROM players WHERE nome = %s', (player_name,))
+        player_data = cur.fetchone()
+        
+        if player_data:
+            player = Player(player_data)
+            player_achs = [a for a in achievements if a['id'] in player.achievements_unlocked]
+            available_achs = [a for a in achievements if a['id'] not in player.achievements_unlocked]
+            return jsonify({
+                'unlocked': player_achs,
+                'available': available_achs
+            })
+        return jsonify({'success': False})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/leaderboard')
 def get_leaderboard():
-    ranked_players = sorted(players.values(), key=lambda p: (p.level, p.xp), reverse=True)
-    leaderboard_data = [{
-        'name': p.nome,
-        'level': p.level,
-        'xp': p.xp,
-        'mesada': p.mesada,
-        'tasks': p.tasks_completed,
-        'battles_won': p.battles_won
-    } for p in ranked_players[:10]]  # Top 10
-    
-    return jsonify({'leaderboard': leaderboard_data})
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute('SELECT nome, level, xp, mesada, tasks_completed, battles_won FROM players ORDER BY level DESC, xp DESC LIMIT 10')
+        players_data = cur.fetchall()
+        cur.close()
+        conn.close()
+        
+        leaderboard_data = [{
+            'name': p[0],
+            'level': p[1],
+            'xp': p[2],
+            'mesada': float(p[3]),
+            'tasks': p[4],
+            'battles_won': p[5]
+        } for p in players_data]
+        
+        return jsonify({'leaderboard': leaderboard_data})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/dashboard/<player_name>')
 def dashboard(player_name):
-    player = players.get(player_name)
-    if player:
-        return render_template('dashboard.html', player=player)
-    return "Jogador não encontrado!"
-
-# Inicializar dados do jogo
-init_game_data()
+    return render_template('dashboard.html')
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    init_db()
+    init_game_data()
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)

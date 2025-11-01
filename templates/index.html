@@ -1,7 +1,9 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-BR">
 <head>
-    <title>🎮 Mesada Gamificada</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎮 Reino das Mesadas</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
@@ -11,14 +13,25 @@
             <p>Complete missões, ganhe XP e aumente sua mesada!</p>
         </div>
 
-        <div class="player-creation">
+        <div class="player-creation" id="playerCreation">
             <h2>👤 Criar Herói</h2>
-            <input type="text" id="playerName" placeholder="Nome do herói">
-            <button onclick="createPlayer()">🎯 Começar Jornada</button>
+            <div class="input-group">
+                <input type="text" id="playerName" placeholder="Digite seu nome de herói" maxlength="50">
+                <button onclick="createPlayer()" id="createBtn">🎯 Começar Jornada</button>
+            </div>
+            <p class="hint">Pressione Enter ou clique no botão para começar</p>
+            
+            <div class="login-section">
+                <h3>🔄 Ou continuar jornada existente</h3>
+                <div class="input-group">
+                    <input type="text" id="loginName" placeholder="Digite seu nome existente">
+                    <button onclick="loginPlayer()">🚪 Entrar</button>
+                </div>
+            </div>
         </div>
 
         <div id="gameInterface" style="display: none;">
-            <!-- Aqui vai o jogo -->
+            <!-- Interface do jogo será carregada aqui pelo JavaScript -->
         </div>
     </div>
 

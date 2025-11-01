@@ -1,7 +1,10 @@
 services:
   - type: web
-    name: mesada-app
+    name: mesada-gamificada
     env: python
     plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app
+    envVars:
+      - key: DATABASE_URL
+        value: postgresql://mesada_db_user:rJFcZevYmO079FkW9ndlqV4gtLNvdbx9@dpg-d438j52li9vc73cng1ug-a/mesada_db

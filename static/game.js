@@ -3,12 +3,19 @@ let currentPlayer = null;
 
 // Criar novo jogador
 async function createPlayer() {
-    const name = document.getElementById('playerName').value;
+    const nameInput = document.getElementById('playerName');
+    const name = nameInput ? nameInput.value.trim() : '';
     
-    if (!name.trim()) {
+    console.log('Tentando criar jogador:', name);
+    
+    if (!name) {
         showMessage('❌ Digite um nome para o herói!', 'defeat');
         return;
     }
+    
+    const btn = document.getElementById('createBtn');
+    btn.disabled = true;
+    btn.textContent = 'Criando...';
     
     try {
         const response = await fetch('/create_player', {
@@ -18,24 +25,58 @@ async function createPlayer() {
         });
         
         const data = await response.json();
+        console.log('Resposta do servidor:', data);
         
         if (data.success) {
             currentPlayer = data.player;
             showMessage(`🎉 Bem-vindo, ${name}! Sua jornada começa agora!`, 'success');
             showGameInterface();
         } else {
-            showMessage('❌ Erro ao criar jogador!', 'defeat');
+            showMessage('❌ Erro ao criar jogador: ' + (data.error || 'Tente outro nome'), 'defeat');
         }
     } catch (error) {
+        console.error('Erro detalhado:', error);
+        showMessage('❌ Erro de conexão com o servidor!', 'defeat');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '🎯 Começar Jornada';
+    }
+}
+
+// Login de jogador existente
+async function loginPlayer() {
+    const nameInput = document.getElementById('loginName');
+    const name = nameInput ? nameInput.value.trim() : '';
+    
+    if (!name) {
+        showMessage('❌ Digite seu nome de herói!', 'defeat');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/get_player/${name}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            currentPlayer = data.player;
+            showMessage(`🎉 Bem-vindo de volta, ${name}!`, 'success');
+            showGameInterface();
+        } else {
+            showMessage('❌ Herói não encontrado! Crie um novo personagem.', 'defeat');
+        }
+    } catch (error) {
+        console.error('Erro no login:', error);
         showMessage('❌ Erro de conexão!', 'defeat');
-        console.error('Error:', error);
     }
 }
 
 // Mostrar interface do jogo
 function showGameInterface() {
-    document.querySelector('.player-creation').style.display = 'none';
-    document.getElementById('gameInterface').style.display = 'block';
+    const playerCreation = document.querySelector('.player-creation');
+    const gameInterface = document.getElementById('gameInterface');
+    
+    if (playerCreation) playerCreation.style.display = 'none';
+    if (gameInterface) gameInterface.style.display = 'block';
     
     loadGameInterface();
 }
@@ -43,6 +84,11 @@ function showGameInterface() {
 // Carregar interface principal do jogo
 function loadGameInterface() {
     const gameInterface = document.getElementById('gameInterface');
+    
+    if (!currentPlayer) {
+        showMessage('❌ Erro: Jogador não carregado!', 'defeat');
+        return;
+    }
     
     gameInterface.innerHTML = `
         <div class="player-stats">
@@ -88,7 +134,7 @@ function loadGameInterface() {
         <div id="gameMessages"></div>
     `;
     
-    showSection('missions'); // Mostrar missões por padrão
+    showSection('missions');
 }
 
 // Mostrar diferentes seções do jogo
@@ -241,12 +287,18 @@ async function completeTask(taskName, difficulty) {
             showMessage(data.result.message, 'success');
             
             // Verificar se subiu de nível
-            if (data.player.level > currentPlayer.level) {
+            if (data.result.level_ups > 0) {
                 showMessage(`🎉 LEVEL UP! Agora você é nível ${data.player.level}! Mesada aumentada!`, 'victory');
             }
             
+            // Verificar conquistas
+            if (data.result.new_achievements && data.result.new_achievements.length > 0) {
+                data.result.new_achievements.forEach(ach => {
+                    showMessage(`🏆 Conquista desbloqueada: ${ach.name}! +R$ ${ach.reward},00`, 'victory');
+                });
+            }
+            
             loadGameInterface();
-            showSection('missions'); // Voltar para as missões
         } else {
             showMessage('❌ Erro ao completar missão!', 'defeat');
         }
@@ -283,15 +335,21 @@ async function startBattle(difficulty) {
                 showMessage(message, 'victory');
                 
                 // Verificar se subiu de nível
-                if (data.player.level > currentPlayer.level) {
+                if (data.result.level_ups > 0) {
                     showMessage(`🎉 LEVEL UP! Agora você é nível ${data.player.level}!`, 'victory');
+                }
+                
+                // Verificar conquistas
+                if (data.result.new_achievements && data.result.new_achievements.length > 0) {
+                    data.result.new_achievements.forEach(ach => {
+                        showMessage(`🏆 Conquista desbloqueada: ${ach.name}! +R$ ${ach.reward},00`, 'victory');
+                    });
                 }
             } else {
                 showMessage(data.result.message, 'defeat');
             }
             
             loadGameInterface();
-            showSection('battles'); // Voltar para as batalhas
         } else {
             showMessage('❌ Erro na batalha!', 'defeat');
         }
@@ -366,7 +424,7 @@ async function buyItem(itemId) {
             currentPlayer = data.player;
             showMessage('✅ Item comprado com sucesso! Verifique seu inventário!', 'success');
             loadGameInterface();
-            showSection('inventory'); // Ir para o inventário
+            showSection('inventory');
         } else {
             showMessage('❌ Mesada insuficiente para comprar este item!', 'defeat');
         }
@@ -456,7 +514,6 @@ async function equipItem(itemName) {
             currentPlayer = data.player;
             showMessage('✅ Item equipado com sucesso!', 'success');
             loadGameInterface();
-            showSection('inventory'); // Atualizar inventário
         } else {
             showMessage('❌ Erro ao equipar item!', 'defeat');
         }
@@ -572,6 +629,11 @@ async function loadLeaderboard() {
 // Mostrar mensagens no jogo
 function showMessage(message, type) {
     const messagesDiv = document.getElementById('gameMessages');
+    if (!messagesDiv) {
+        console.log('Mensagem:', message, 'Tipo:', type);
+        return;
+    }
+    
     const messageElement = document.createElement('div');
     messageElement.className = `message ${type}`;
     messageElement.innerHTML = message;
@@ -591,12 +653,27 @@ function showMessage(message, type) {
 // Tecla Enter para criar jogador
 document.addEventListener('DOMContentLoaded', function() {
     const playerNameInput = document.getElementById('playerName');
+    const loginNameInput = document.getElementById('loginName');
+    
     if (playerNameInput) {
         playerNameInput.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 createPlayer();
             }
         });
+    }
+    
+    if (loginNameInput) {
+        loginNameInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                loginPlayer();
+            }
+        });
+    }
+    
+    // Focar no primeiro input
+    if (playerNameInput) {
+        playerNameInput.focus();
     }
 });
 
