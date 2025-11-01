@@ -1,17 +1,30 @@
 from flask import Flask, render_template, request, jsonify
 import random
 from datetime import datetime
-import psycopg2
+import pg8000
 import os
 import json
 
 app = Flask(__name__)
 app.secret_key = '30591bbfa70ae38582897d226608fd99'
 
-# Configuração do PostgreSQL
+# Configuração do PostgreSQL com pg8000
 def get_db_connection():
     DATABASE_URL = os.environ.get('DATABASE_URL', 'postgresql://mesada_db_user:rJFcZevYmO079FkW9ndlqV4gtLNvdbx9@dpg-d438j52li9vc73cng1ug-a/mesada_db')
-    conn = psycopg2.connect(DATABASE_URL)
+    
+    # Parse da URL de conexão
+    url_parts = DATABASE_URL.replace('postgresql://', '').split('@')
+    user_pass = url_parts[0].split(':')
+    host_db = url_parts[1].split('/')
+    host_port = host_db[0].split(':')
+    
+    conn = pg8000.connect(
+        user=user_pass[0],
+        password=user_pass[1],
+        host=host_port[0],
+        port=int(host_port[1]) if len(host_port) > 1 else 5432,
+        database=host_db[1]
+    )
     return conn
 
 # Inicializar banco de dados
@@ -33,10 +46,10 @@ def init_db():
                 battles_won INTEGER DEFAULT 0,
                 battles_lost INTEGER DEFAULT 0,
                 total_money_earned DECIMAL(10,2) DEFAULT 10.00,
-                skills JSONB DEFAULT '{"forca": 1, "defesa": 1, "sorte": 1, "inteligencia": 1}',
-                inventory JSONB DEFAULT '[]',
-                equipped JSONB DEFAULT '{"weapon": null, "armor": null, "accessory": null}',
-                achievements_unlocked JSONB DEFAULT '[]',
+                skills TEXT DEFAULT '{"forca": 1, "defesa": 1, "sorte": 1, "inteligencia": 1}',
+                inventory TEXT DEFAULT '[]',
+                equipped TEXT DEFAULT '{"weapon": null, "armor": null, "accessory": null}',
+                achievements_unlocked TEXT DEFAULT '[]',
                 join_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
@@ -78,18 +91,20 @@ class Player:
     def __init__(self, data):
         self.id = data[0]
         self.nome = data[1]
-        self.level = data[2]
-        self.xp = data[3]
-        self.xp_need = data[4]
-        self.mesada = float(data[5])
-        self.tasks_completed = data[6]
-        self.battles_won = data[7]
-        self.battles_lost = data[8]
-        self.total_money_earned = float(data[9])
-        self.skills = data[10] if data[10] else {"forca": 1, "defesa": 1, "sorte": 1, "inteligencia": 1}
-        self.inventory = data[11] if data[11] else []
-        self.equipped = data[12] if data[12] else {"weapon": None, "armor": None, "accessory": None}
-        self.achievements_unlocked = data[13] if data[13] else []
+        self.level = data[2] or 1
+        self.xp = data[3] or 0
+        self.xp_need = data[4] or 100
+        self.mesada = float(data[5] or 10.00)
+        self.tasks_completed = data[6] or 0
+        self.battles_won = data[7] or 0
+        self.battles_lost = data[8] or 0
+        self.total_money_earned = float(data[9] or 10.00)
+        
+        # Parse JSON fields
+        self.skills = json.loads(data[10]) if data[10] else {"forca": 1, "defesa": 1, "sorte": 1, "inteligencia": 1}
+        self.inventory = json.loads(data[11]) if data[11] else []
+        self.equipped = json.loads(data[12]) if data[12] else {"weapon": None, "armor": None, "accessory": None}
+        self.achievements_unlocked = json.loads(data[13]) if data[13] else []
         self.join_date = data[14]
     
     def save(self):
@@ -421,6 +436,11 @@ def get_leaderboard():
 @app.route('/dashboard/<player_name>')
 def dashboard(player_name):
     return render_template('dashboard.html')
+
+# Health check para Render
+@app.route('/health')
+def health():
+    return jsonify({'status': 'healthy', 'message': 'App está funcionando!'})
 
 if __name__ == '__main__':
     init_db()
