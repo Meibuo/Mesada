@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dashboard - App de Mesada</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>📊 Dashboard de Mesadas</h1>
+        
+        {% if mesadas %}
+            <div class="mesadas-grid">
+                {% for nome, dados in mesadas.items() %}
+                <div class="mesada-card">
+                    <h3>{{ nome }}</h3>
+                    <div class="saldo">R$ {{ "%.2f"|format(dados.saldo) }}</div>
+                    <div class="mesada-original">Mesada: R$ {{ "%.2f"|format(dados.valor) }}</div>
+                    
+                    <h4>Últimas Transações:</h4>
+                    {% if dados.transacoes %}
+                        <ul class="transacoes">
+                            {% for transacao in dados.transacoes[-5:]|reverse %}
+                            <li class="transacao {{ transacao.tipo }}">
+                                <span class="descricao">{{ transacao.descricao }}</span>
+                                <span class="valor">R$ {{ "%.2f"|format(transacao.valor) }}</span>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p class="sem-transacoes">Nenhuma transação ainda</p>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="sem-mesadas">
+                <p>Nenhuma mesada cadastrada ainda!</p>
+                <a href="/" class="btn">Voltar e Adicionar Mesada</a>
+            </div>
+        {% endif %}
+        
+        <a href="/" class="btn voltar">← Voltar</a>
+    </div>
+</body>
+</html>
