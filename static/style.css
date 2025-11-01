@@ -1,211 +1,43 @@
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
-
+/* Estilos gamificados - tema de RPG */
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    min-height: 100vh;
+    background: linear-gradient(135deg, #1e3c72, #2a5298);
+    color: white;
+    font-family: 'Arial', sans-serif;
+}
+
+.game-header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.player-creation {
+    text-align: center;
+    background: rgba(255,255,255,0.1);
     padding: 20px;
-    color: #333;
-}
-
-.container {
-    max-width: 1200px;
-    margin: 0 auto;
-}
-
-h1 {
-    text-align: center;
-    color: white;
-    margin-bottom: 30px;
-    font-size: 2.5em;
-    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-}
-
-/* Forms */
-form {
-    background: white;
-    padding: 25px;
     border-radius: 15px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-    margin-bottom: 25px;
-    max-width: 500px;
-    margin-left: auto;
-    margin-right: auto;
 }
 
-form h3 {
-    margin-bottom: 20px;
-    color: #4a5568;
-    text-align: center;
-}
-
-input {
-    width: 100%;
-    padding: 12px 15px;
-    margin-bottom: 15px;
-    border: 2px solid #e2e8f0;
-    border-radius: 8px;
-    font-size: 16px;
-    transition: border-color 0.3s;
-}
-
-input:focus {
-    outline: none;
-    border-color: #667eea;
-}
-
-button {
-    width: 100%;
-    padding: 12px;
-    background: linear-gradient(135deg, #667eea, #764ba2);
-    color: white;
-    border: none;
-    border-radius: 8px;
-    font-size: 16px;
-    font-weight: bold;
+.mission, .battle {
+    background: rgba(255,255,255,0.1);
+    padding: 15px;
+    margin: 10px 0;
+    border-radius: 10px;
     cursor: pointer;
-    transition: transform 0.2s;
-}
-
-button:hover {
-    transform: translateY(-2px);
-}
-
-/* Grid de Mesadas */
-.mesadas-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 25px;
-    margin-bottom: 30px;
-}
-
-.mesada-card {
-    background: white;
-    padding: 25px;
-    border-radius: 15px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-    transition: transform 0.3s;
-}
-
-.mesada-card:hover {
-    transform: translateY(-5px);
-}
-
-.mesada-card h3 {
-    color: #2d3748;
-    margin-bottom: 15px;
-    font-size: 1.5em;
-    text-align: center;
-}
-
-.saldo {
-    font-size: 2em;
-    font-weight: bold;
-    text-align: center;
-    color: #48bb78;
-    margin-bottom: 10px;
-}
-
-.mesada-original {
-    text-align: center;
-    color: #718096;
-    margin-bottom: 20px;
-}
-
-/* Transações */
-.transacoes {
-    list-style: none;
-    margin-top: 15px;
-}
-
-.transacao {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px;
-    margin-bottom: 8px;
-    background: #f7fafc;
-    border-radius: 8px;
-    border-left: 4px solid #48bb78;
-}
-
-.transacao.gasto {
-    border-left-color: #f56565;
-}
-
-.descricao {
-    font-weight: 500;
-}
-
-.valor {
-    font-weight: bold;
-}
-
-.transacao.gasto .valor {
-    color: #f56565;
-}
-
-.sem-transacoes {
-    text-align: center;
-    color: #a0aec0;
-    font-style: italic;
-    margin: 20px 0;
-}
-
-/* Botões */
-.btn {
-    display: inline-block;
-    padding: 12px 25px;
-    background: white;
-    color: #667eea;
-    text-decoration: none;
-    border-radius: 8px;
-    font-weight: bold;
-    text-align: center;
     transition: all 0.3s;
 }
 
-.btn:hover {
-    background: #667eea;
-    color: white;
-    transform: translateY(-2px);
+.mission:hover, .battle:hover {
+    background: rgba(255,255,255,0.2);
+    transform: scale(1.05);
 }
 
-.voltar {
-    display: block;
-    width: fit-content;
-    margin: 0 auto;
-}
-
-.sem-mesadas {
+.message {
+    padding: 10px;
+    margin: 10px 0;
+    border-radius: 5px;
     text-align: center;
-    background: white;
-    padding: 50px;
-    border-radius: 15px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
 }
 
-.sem-mesadas p {
-    font-size: 1.2em;
-    margin-bottom: 20px;
-    color: #4a5568;
-}
-
-/* Responsivo */
-@media (max-width: 768px) {
-    .mesadas-grid {
-        grid-template-columns: 1fr;
-    }
-    
-    body {
-        padding: 10px;
-    }
-    
-    h1 {
-        font-size: 2em;
-    }
-}
+.message.success { background: #4CAF50; }
+.message.victory { background: #FF9800; }
+.message.defeat { background: #f44336; }

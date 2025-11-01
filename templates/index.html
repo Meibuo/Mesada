@@ -1,30 +1,27 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>App de Mesada</title>
+    <title>🎮 Mesada Gamificada</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <h1>💰 App de Mesada</h1>
-    
-    <form id="mesadaForm">
-        <h3>Adicionar Mesada</h3>
-        <input type="text" name="nome" placeholder="Nome" required>
-        <input type="number" name="valor" placeholder="Valor" step="0.01" required>
-        <button type="submit">Adicionar</button>
-    </form>
+    <div class="container">
+        <div class="game-header">
+            <h1>🏰 Reino das Mesadas</h1>
+            <p>Complete missões, ganhe XP e aumente sua mesada!</p>
+        </div>
 
-    <form id="gastoForm">
-        <h3>Registrar Gasto</h3>
-        <input type="text" name="nome" placeholder="Nome" required>
-        <input type="number" name="valor" placeholder="Valor" step="0.01" required>
-        <input type="text" name="descricao" placeholder="Descrição" required>
-        <button type="submit">Registrar</button>
-    </form>
+        <div class="player-creation">
+            <h2>👤 Criar Herói</h2>
+            <input type="text" id="playerName" placeholder="Nome do herói">
+            <button onclick="createPlayer()">🎯 Começar Jornada</button>
+        </div>
 
-    <a href="/dashboard">Ver Dashboard</a>
+        <div id="gameInterface" style="display: none;">
+            <!-- Aqui vai o jogo -->
+        </div>
+    </div>
 
-    <script>
-        // JavaScript para enviar os formulários
-    </script>
+    <script src="{{ url_for('static', filename='game.js') }}"></script>
 </body>
 </html>
