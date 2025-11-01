@@ -301,13 +301,18 @@ class Player:
         
         return new_achievements
 
-# Inicializar app
-@app.before_first_request
-def initialize():
-    print("🚀 Inicializando aplicação...")
-    init_db()
-    init_game_data()
-    print("✅ Aplicação inicializada!")
+# Variável para controlar inicialização
+app_initialized = False
+
+@app.before_request
+def initialize_app():
+    global app_initialized
+    if not app_initialized:
+        print("🚀 Inicializando aplicação...")
+        init_db()
+        init_game_data()
+        app_initialized = True
+        print("✅ Aplicação inicializada!")
 
 # Rotas da API
 @app.route('/')
@@ -525,8 +530,9 @@ def debug_create_table():
 
 if __name__ == '__main__':
     # Inicializar banco na startup
+    print("🚀 Iniciando servidor Flask...")
     init_db()
     init_game_data()
     
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=True)
+    app.run(host='0.0.0.0', port=port, debug=False)
