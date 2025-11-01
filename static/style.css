@@ -1,43 +1,95 @@
-/* Estilos gamificados - tema de RPG */
-body {
-    background: linear-gradient(135deg, #1e3c72, #2a5298);
+/* Estilos expandidos para as novas features */
+
+.game-nav {
+    display: flex;
+    gap: 10px;
+    margin: 20px 0;
+    flex-wrap: wrap;
+}
+
+.game-nav button {
+    background: rgba(255,255,255,0.2);
+    border: none;
     color: white;
-    font-family: 'Arial', sans-serif;
-}
-
-.game-header {
-    text-align: center;
-    margin-bottom: 30px;
-}
-
-.player-creation {
-    text-align: center;
-    background: rgba(255,255,255,0.1);
-    padding: 20px;
-    border-radius: 15px;
-}
-
-.mission, .battle {
-    background: rgba(255,255,255,0.1);
-    padding: 15px;
-    margin: 10px 0;
-    border-radius: 10px;
+    padding: 10px 15px;
+    border-radius: 8px;
     cursor: pointer;
     transition: all 0.3s;
 }
 
-.mission:hover, .battle:hover {
-    background: rgba(255,255,255,0.2);
-    transform: scale(1.05);
+.game-nav button:hover {
+    background: rgba(255,255,255,0.3);
+    transform: translateY(-2px);
 }
 
-.message {
+.shop-items, .inventory-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-top: 15px;
+}
+
+.shop-item, .inventory-item {
+    background: rgba(255,255,255,0.1);
+    padding: 15px;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.2);
+}
+
+.achievement {
     padding: 10px;
     margin: 10px 0;
-    border-radius: 5px;
-    text-align: center;
+    border-radius: 8px;
+    border-left: 4px solid;
 }
 
-.message.success { background: #4CAF50; }
-.message.victory { background: #FF9800; }
-.message.defeat { background: #f44336; }
+.achievement.unlocked {
+    background: rgba(76, 175, 80, 0.2);
+    border-left-color: #4CAF50;
+}
+
+.achievement.locked {
+    background: rgba(158, 158, 158, 0.2);
+    border-left-color: #9E9E9E;
+    opacity: 0.7;
+}
+
+.leaderboard {
+    margin-top: 15px;
+}
+
+.leaderboard-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 15px;
+    margin: 5px 0;
+    background: rgba(255,255,255,0.1);
+    border-radius: 8px;
+}
+
+.leaderboard-item.current-player {
+    background: rgba(255, 193, 7, 0.3);
+    border: 1px solid #FFC107;
+}
+
+.skills, .equipment {
+    margin: 15px 0;
+    padding: 15px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 10px;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
+    margin: 15px 0;
+}
+
+.stat {
+    background: rgba(255,255,255,0.1);
+    padding: 10px;
+    border-radius: 8px;
+    text-align: center;
+}
