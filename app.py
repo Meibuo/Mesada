@@ -12,20 +12,24 @@ app.secret_key = '30591bbfa70ae38582897d226608fd99'
 def get_db_connection():
     DATABASE_URL = os.environ.get('DATABASE_URL', 'postgresql://mesada_db_user:rJFcZevYmO079FkW9ndlqV4gtLNvdbx9@dpg-d438j52li9vc73cng1ug-a/mesada_db')
     
-    # Parse da URL de conexão
-    url_parts = DATABASE_URL.replace('postgresql://', '').split('@')
-    user_pass = url_parts[0].split(':')
-    host_db = url_parts[1].split('/')
-    host_port = host_db[0].split(':')
-    
-    conn = pg8000.connect(
-        user=user_pass[0],
-        password=user_pass[1],
-        host=host_port[0],
-        port=int(host_port[1]) if len(host_port) > 1 else 5432,
-        database=host_db[1]
-    )
-    return conn
+    try:
+        # Parse da URL de conexão
+        url_parts = DATABASE_URL.replace('postgresql://', '').split('@')
+        user_pass = url_parts[0].split(':')
+        host_db = url_parts[1].split('/')
+        host_port = host_db[0].split(':')
+        
+        conn = pg8000.connect(
+            user=user_pass[0],
+            password=user_pass[1],
+            host=host_port[0],
+            port=int(host_port[1]) if len(host_port) > 1 else 5432,
+            database=host_db[1]
+        )
+        return conn
+    except Exception as e:
+        print(f"❌ Erro na conexão com o banco: {e}")
+        raise e
 
 # Inicializar banco de dados
 def init_db():
@@ -33,33 +37,50 @@ def init_db():
         conn = get_db_connection()
         cur = conn.cursor()
         
-        # Tabela de jogadores
-        cur.execute('''
-            CREATE TABLE IF NOT EXISTS players (
-                id SERIAL PRIMARY KEY,
-                nome VARCHAR(100) UNIQUE NOT NULL,
-                level INTEGER DEFAULT 1,
-                xp INTEGER DEFAULT 0,
-                xp_need INTEGER DEFAULT 100,
-                mesada DECIMAL(10,2) DEFAULT 10.00,
-                tasks_completed INTEGER DEFAULT 0,
-                battles_won INTEGER DEFAULT 0,
-                battles_lost INTEGER DEFAULT 0,
-                total_money_earned DECIMAL(10,2) DEFAULT 10.00,
-                skills TEXT DEFAULT '{"forca": 1, "defesa": 1, "sorte": 1, "inteligencia": 1}',
-                inventory TEXT DEFAULT '[]',
-                equipped TEXT DEFAULT '{"weapon": null, "armor": null, "accessory": null}',
-                achievements_unlocked TEXT DEFAULT '[]',
-                join_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
+        print("✅ Conectado ao banco. Criando tabela players...")
+        
+        # Verificar se a tabela já existe
+        cur.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = 'players'
+            );
+        """)
+        table_exists = cur.fetchone()[0]
+        
+        if not table_exists:
+            print("📦 Criando tabela players...")
+            # Tabela de jogadores
+            cur.execute('''
+                CREATE TABLE players (
+                    id SERIAL PRIMARY KEY,
+                    nome VARCHAR(100) UNIQUE NOT NULL,
+                    level INTEGER DEFAULT 1,
+                    xp INTEGER DEFAULT 0,
+                    xp_need INTEGER DEFAULT 100,
+                    mesada DECIMAL(10,2) DEFAULT 10.00,
+                    tasks_completed INTEGER DEFAULT 0,
+                    battles_won INTEGER DEFAULT 0,
+                    battles_lost INTEGER DEFAULT 0,
+                    total_money_earned DECIMAL(10,2) DEFAULT 10.00,
+                    skills TEXT DEFAULT '{"forca": 1, "defesa": 1, "sorte": 1, "inteligencia": 1}',
+                    inventory TEXT DEFAULT '[]',
+                    equipped TEXT DEFAULT '{"weapon": null, "armor": null, "accessory": null}',
+                    achievements_unlocked TEXT DEFAULT '[]',
+                    join_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            print("✅ Tabela players criada com sucesso!")
+        else:
+            print("✅ Tabela players já existe.")
         
         conn.commit()
         cur.close()
         conn.close()
-        print("✅ Banco de dados inicializado com sucesso!")
+        
     except Exception as e:
         print(f"❌ Erro ao inicializar banco: {e}")
+        # Não levanta exceção para não quebrar o app
 
 # Dados do jogo
 shop_items = []
@@ -108,25 +129,30 @@ class Player:
         self.join_date = data[14]
     
     def save(self):
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute('''
-            UPDATE players SET 
-                level = %s, xp = %s, xp_need = %s, mesada = %s, 
-                tasks_completed = %s, battles_won = %s, battles_lost = %s,
-                total_money_earned = %s, skills = %s, inventory = %s,
-                equipped = %s, achievements_unlocked = %s
-            WHERE id = %s
-        ''', (
-            self.level, self.xp, self.xp_need, self.mesada,
-            self.tasks_completed, self.battles_won, self.battles_lost,
-            self.total_money_earned, json.dumps(self.skills), 
-            json.dumps(self.inventory), json.dumps(self.equipped),
-            json.dumps(self.achievements_unlocked), self.id
-        ))
-        conn.commit()
-        cur.close()
-        conn.close()
+        try:
+            conn = get_db_connection()
+            cur = conn.cursor()
+            cur.execute('''
+                UPDATE players SET 
+                    level = %s, xp = %s, xp_need = %s, mesada = %s, 
+                    tasks_completed = %s, battles_won = %s, battles_lost = %s,
+                    total_money_earned = %s, skills = %s, inventory = %s,
+                    equipped = %s, achievements_unlocked = %s
+                WHERE id = %s
+            ''', (
+                self.level, self.xp, self.xp_need, self.mesada,
+                self.tasks_completed, self.battles_won, self.battles_lost,
+                self.total_money_earned, json.dumps(self.skills), 
+                json.dumps(self.inventory), json.dumps(self.equipped),
+                json.dumps(self.achievements_unlocked), self.id
+            ))
+            conn.commit()
+            cur.close()
+            conn.close()
+            return True
+        except Exception as e:
+            print(f"❌ Erro ao salvar jogador: {e}")
+            return False
     
     def add_xp(self, amount):
         self.xp += amount
@@ -157,7 +183,12 @@ class Player:
         # Verificar conquistas
         new_achievements = self.check_achievements()
         
-        self.save()
+        success = self.save()
+        
+        if not success:
+            return {
+                'error': 'Erro ao salvar progresso'
+            }
         
         return {
             'xp': xp_reward,
@@ -191,7 +222,12 @@ class Player:
                 self.inventory.append(item_drop)
             
             new_achievements = self.check_achievements()
-            self.save()
+            success = self.save()
+            
+            if not success:
+                return {
+                    'error': 'Erro ao salvar progresso'
+                }
             
             return {
                 'victory': True,
@@ -205,7 +241,13 @@ class Player:
             }
         else:
             self.battles_lost += 1
-            self.save()
+            success = self.save()
+            
+            if not success:
+                return {
+                    'error': 'Erro ao salvar progresso'
+                }
+            
             return {
                 'victory': False,
                 'message': '💀 Derrota! Mais sorte na próxima vez!'
@@ -216,8 +258,7 @@ class Player:
         if item and self.mesada >= item['price']:
             self.mesada -= item['price']
             self.inventory.append(item)
-            self.save()
-            return True
+            return self.save()
         return False
     
     def equip_item(self, item_name):
@@ -229,8 +270,7 @@ class Player:
                 self.inventory.append(self.equipped[slot])
             self.equipped[slot] = item
             self.inventory.remove(item)
-            self.save()
-            return True
+            return self.save()
         return False
     
     def check_achievements(self):
@@ -260,6 +300,14 @@ class Player:
             self.save()
         
         return new_achievements
+
+# Inicializar app
+@app.before_first_request
+def initialize():
+    print("🚀 Inicializando aplicação...")
+    init_db()
+    init_game_data()
+    print("✅ Aplicação inicializada!")
 
 # Rotas da API
 @app.route('/')
@@ -297,7 +345,7 @@ def create_player():
         return jsonify({'success': True, 'player': player_obj.__dict__})
         
     except Exception as e:
-        print(f"Erro ao criar jogador: {e}")
+        print(f"❌ Erro ao criar jogador: {e}")
         return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/get_player/<player_name>')
@@ -331,7 +379,7 @@ def complete_task():
             player = Player(player_data)
             result = player.complete_task(data['task_name'], data['difficulty'])
             return jsonify({'success': True, 'result': result, 'player': player.__dict__})
-        return jsonify({'success': False})
+        return jsonify({'success': False, 'error': 'Jogador não encontrado'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
@@ -348,7 +396,7 @@ def battle():
             player = Player(player_data)
             result = player.battle(data['difficulty'])
             return jsonify({'success': True, 'result': result, 'player': player.__dict__})
-        return jsonify({'success': False})
+        return jsonify({'success': False, 'error': 'Jogador não encontrado'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
@@ -369,7 +417,9 @@ def buy_item():
             player = Player(player_data)
             if player.buy_item(data['item_id']):
                 return jsonify({'success': True, 'player': player.__dict__})
-        return jsonify({'success': False})
+            else:
+                return jsonify({'success': False, 'error': 'Mesada insuficiente ou item não encontrado'})
+        return jsonify({'success': False, 'error': 'Jogador não encontrado'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
@@ -386,7 +436,9 @@ def equip_item():
             player = Player(player_data)
             if player.equip_item(data['item_name']):
                 return jsonify({'success': True, 'player': player.__dict__})
-        return jsonify({'success': False})
+            else:
+                return jsonify({'success': False, 'error': 'Item não encontrado no inventário'})
+        return jsonify({'success': False, 'error': 'Jogador não encontrado'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
@@ -403,10 +455,11 @@ def get_achievements(player_name):
             player_achs = [a for a in achievements if a['id'] in player.achievements_unlocked]
             available_achs = [a for a in achievements if a['id'] not in player.achievements_unlocked]
             return jsonify({
+                'success': True,
                 'unlocked': player_achs,
                 'available': available_achs
             })
-        return jsonify({'success': False})
+        return jsonify({'success': False, 'error': 'Jogador não encontrado'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
@@ -429,7 +482,7 @@ def get_leaderboard():
             'battles_won': p[5]
         } for p in players_data]
         
-        return jsonify({'leaderboard': leaderboard_data})
+        return jsonify({'success': True, 'leaderboard': leaderboard_data})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
@@ -440,10 +493,40 @@ def dashboard(player_name):
 # Health check para Render
 @app.route('/health')
 def health():
-    return jsonify({'status': 'healthy', 'message': 'App está funcionando!'})
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute('SELECT COUNT(*) FROM players')
+        count = cur.fetchone()[0]
+        cur.close()
+        conn.close()
+        
+        return jsonify({
+            'status': 'healthy', 
+            'message': 'App está funcionando!',
+            'players_count': count,
+            'database': 'connected'
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e),
+            'database': 'disconnected'
+        }), 500
+
+# Rota para debug - criar tabela manualmente se necessário
+@app.route('/debug/create_table')
+def debug_create_table():
+    try:
+        init_db()
+        return jsonify({'success': True, 'message': 'Tabela criada/verificada com sucesso!'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
 
 if __name__ == '__main__':
+    # Inicializar banco na startup
     init_db()
     init_game_data()
+    
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=port, debug=True)

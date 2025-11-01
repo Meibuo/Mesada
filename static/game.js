@@ -1,3 +1,69 @@
+// game.js - Adicione esta função no início para debug
+async function checkHealth() {
+    try {
+        const response = await fetch('/health');
+        const data = await response.json();
+        console.log('Health check:', data);
+        return data;
+    } catch (error) {
+        console.error('Health check failed:', error);
+        return null;
+    }
+}
+
+// No createPlayer, adicione debug:
+async function createPlayer() {
+    const nameInput = document.getElementById('playerName');
+    const name = nameInput ? nameInput.value.trim() : '';
+    
+    console.log('Tentando criar jogador:', name);
+    
+    if (!name) {
+        showMessage('❌ Digite um nome para o herói!', 'defeat');
+        return;
+    }
+    
+    const btn = document.getElementById('createBtn');
+    btn.disabled = true;
+    btn.textContent = 'Criando...';
+    
+    try {
+        // Debug: verificar saúde do app
+        const health = await checkHealth();
+        console.log('App health:', health);
+        
+        const response = await fetch('/create_player', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({nome: name})
+        });
+        
+        const data = await response.json();
+        console.log('Resposta do servidor:', data);
+        
+        if (data.success) {
+            currentPlayer = data.player;
+            showMessage(`🎉 Bem-vindo, ${name}! Sua jornada começa agora!`, 'success');
+            showGameInterface();
+        } else {
+            const errorMsg = data.error || 'Erro desconhecido';
+            showMessage(`❌ Erro ao criar jogador: ${errorMsg}`, 'defeat');
+            
+            // Se for erro de tabela, tentar criar manualmente
+            if (errorMsg.includes('relation') && errorMsg.includes('does not exist')) {
+                showMessage('🛠️ Tentando criar tabela automaticamente...', 'defeat');
+                await fetch('/debug/create_table');
+            }
+        }
+    } catch (error) {
+        console.error('Erro detalhado:', error);
+        showMessage('❌ Erro de conexão com o servidor!', 'defeat');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '🎯 Começar Jornada';
+    }
+}
+
 // game.js - Sistema Completo de Mesada Gamificada
 let currentPlayer = null;
 
